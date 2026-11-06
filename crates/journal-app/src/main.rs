@@ -4,6 +4,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+#[cfg(windows)]
+mod dpi;
 mod kalender;
 
 use eframe::egui;
@@ -26,6 +28,10 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Tagebuch",
         optionen,
-        Box::new(|cc| Ok(Box::new(app::TagebuchApp::new(&cc.egui_ctx, start)))),
+        Box::new(|cc| {
+            #[cfg(windows)]
+            dpi::installieren(cc);
+            Ok(Box::new(app::TagebuchApp::new(&cc.egui_ctx, start)))
+        }),
     )
 }

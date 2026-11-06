@@ -22,6 +22,10 @@ tempfile = "3.27.0"
 [build-dependencies]
 winresource = "0.1.34"
 
+[target."cfg(windows)".dependencies]
+raw-window-handle = "0.6"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_HiDpi", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
 # macOS-Bundle mit `cargo bundle --release` (Kap. 12.5).
 [package.metadata.bundle]
 name = "Tagebuch"
