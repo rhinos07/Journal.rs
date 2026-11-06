@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tagebuch
+GenericName=Trainingstagebuch
+Comment=Trainingstagebuch mit Monatskalender
+Exec=trainingstagebuch
+Icon=trainingstagebuch
+Terminal=false
+Categories=Utility;Office;
+StartupWMClass=trainingstagebuch

@@ -9,11 +9,23 @@ path = "src/main.rs"
 
 [dependencies]
 chrono = "0.4.45"
-eframe = "0.37.0"
+eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "glow", "wayland", "x11"] }
 egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
 journal-core = { path = "../journal-core" }
 rfd = "0.17.2"
 
 [dev-dependencies]
 egui_kittest = { version = "0.37", features = ["eframe", "wgpu", "snapshot"] }
+image = { version = "0.25", default-features = false, features = ["png", "ico"] }
 tempfile = "3.27.0"
+
+[build-dependencies]
+winresource = "0.1.34"
+
+# macOS-Bundle mit `cargo bundle --release` (Kap. 12.5).
+[package.metadata.bundle]
+name = "Tagebuch"
+identifier = "de.trainingstagebuch.app"
+icon = ["assets/icon-32.png", "assets/icon-128.png", "assets/icon-256.png", "assets/icon-512.png"]
+category = "public.app-category.productivity"
+short_description = "Trainingstagebuch mit Monatskalender"

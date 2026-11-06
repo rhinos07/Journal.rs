@@ -5,3 +5,9 @@ members = ["crates/journal-core", "crates/journal-app"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+
+# Kleinere und schnellere Release-Exe (Kap. 12.5).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

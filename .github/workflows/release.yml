@@ -1,0 +1,72 @@
+# Baut bei einem Tag v* die Pakete für Windows, macOS und Linux und hängt sie an ein
+# GitHub-Release (Kap. 12.5). Das Release wird als Entwurf angelegt und muss von Hand
+# veröffentlicht werden.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p journal-app
+      - name: Paket
+        shell: pwsh
+        run: Compress-Archive -Path target/release/trainingstagebuch.exe -DestinationPath Tagebuch-windows-x64.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: Tagebuch-windows-x64.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - run: cargo install cargo-bundle --locked
+      - name: Bauen (Apple Silicon und Intel)
+        run: |
+          cargo build --release -p journal-app --target aarch64-apple-darwin
+          cargo build --release -p journal-app --target x86_64-apple-darwin
+      - name: Bundle mit Universal-Binary
+        run: |
+          cd crates/journal-app
+          cargo bundle --release
+          cd ../..
+          app=$(find target -path '*/bundle/osx/Tagebuch.app' -maxdepth 5 | head -1)
+          lipo -create -output "$app/Contents/MacOS/trainingstagebuch" \
+            target/aarch64-apple-darwin/release/trainingstagebuch \
+            target/x86_64-apple-darwin/release/trainingstagebuch
+          ditto -c -k --keepParent "$app" Tagebuch-macos.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: Tagebuch-macos.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release -p journal-app
+      - name: Paket
+        run: |
+          mkdir -p paket/tagebuch
+          cp target/release/trainingstagebuch paket/tagebuch/
+          cp packaging/linux/trainingstagebuch.desktop packaging/linux/install.sh paket/tagebuch/
+          cp crates/journal-app/assets/icon-256.png paket/tagebuch/trainingstagebuch.png
+          chmod +x paket/tagebuch/install.sh
+          tar -C paket -czf Tagebuch-linux-x64.tar.gz tagebuch
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: Tagebuch-linux-x64.tar.gz

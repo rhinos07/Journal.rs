@@ -870,7 +870,15 @@ geänderter Text automatisch gespeichert, nach denselben Regeln wie der Auto-Sav
 
 - Gebaut und getestet wird über **GitHub Actions** auf Windows, macOS und Linux. Die Tests des
   Kerns laufen auf allen drei Systemen.
-- Windows: eine einzelne `.exe` ohne Konsolenfenster.
+- Windows: eine einzelne `.exe` ohne Konsolenfenster, mit eingebettetem Icon und Versionsinfo.
 - Linux: eine Binärdatei mit `.desktop`-Datei, optional AppImage oder `.deb`.
-- macOS: ein `.app`-Bundle. Für die Weitergabe an andere Macs ohne Warnung braucht es eine
-  Signatur mit Apple-Entwickler-Account (KANN). Für den Eigenbedarf reicht „Rechtsklick → Öffnen“.
+- macOS: ein `.app`-Bundle als Universal-Binary für Apple Silicon und Intel. Für die Weitergabe
+  an andere Macs ohne Warnung braucht es eine Signatur mit Apple-Entwickler-Account (KANN). Für den Eigenbedarf reicht „Rechtsklick → Öffnen“.
+- **Grafik:** eframe mit dem OpenGL-Backend `glow` statt `wgpu`. Die Exe ist damit etwa halb so
+  groß (8 statt 16 MB). Voraussetzung ist ein OpenGL-Treiber (auf normalen Rechnern vorhanden,
+  fehlt aber z. B. in manchen virtuellen Maschinen ohne Grafiktreiber).
+- **Icon:** eigenes Kalender-Icon in den Farben der App (`crates/journal-app/assets/`, erzeugt
+  mit `cargo run -p journal-app --example icon`). Das Icon der C#-Version wird wegen unklarer
+  Lizenz nicht übernommen.
+- **Pakete:** `.github/workflows/release.yml` baut bei einem Tag `v*` die Pakete für alle drei
+  Systeme (siehe README).

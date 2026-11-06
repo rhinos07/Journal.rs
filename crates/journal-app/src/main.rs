@@ -14,7 +14,13 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_title("Tagebuch")
             .with_inner_size([500.0, 600.0])
-            .with_min_inner_size([420.0, 520.0]),
+            .with_min_inner_size([420.0, 520.0])
+            // Muss zum Namen der .desktop-Datei passen (Linux, Wayland).
+            .with_app_id("trainingstagebuch")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon-256.png"))
+                    .expect("eingebettetes Icon ist ein gültiges PNG"),
+            ),
         ..Default::default()
     };
     eframe::run_native(
