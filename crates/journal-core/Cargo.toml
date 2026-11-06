@@ -1,0 +1,14 @@
+[package]
+name = "journal-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+directories = "6.0.0"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.2.0"
+toml_edit = "0.25.18"
+
+[dev-dependencies]
+tempfile = "3.27.0"

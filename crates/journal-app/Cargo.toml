@@ -1,0 +1,11 @@
+[package]
+name = "journal-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "trainingstagebuch"
+path = "src/main.rs"
+
+[dependencies]
+journal-core = { path = "../journal-core" }
