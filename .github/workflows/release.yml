@@ -1,6 +1,7 @@
 # Baut bei einem Tag v* die Pakete für Windows, macOS und Linux und hängt sie an ein
 # GitHub-Release (Kap. 12.5). Das Release wird als Entwurf angelegt und muss von Hand
-# veröffentlicht werden.
+# veröffentlicht werden. Die Bau-Jobs laden ihre Pakete als Artefakte hoch, erst der letzte
+# Job legt den Entwurf an, damit es genau einen gibt.
 name: Release
 
 on:
@@ -20,10 +21,10 @@ jobs:
       - name: Paket
         shell: pwsh
         run: Compress-Archive -Path target/release/trainingstagebuch.exe -DestinationPath Tagebuch-windows-x64.zip
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          draft: true
-          files: Tagebuch-windows-x64.zip
+          name: paket-windows
+          path: Tagebuch-windows-x64.zip
 
   macos:
     runs-on: macos-latest
@@ -47,10 +48,10 @@ jobs:
             target/aarch64-apple-darwin/release/trainingstagebuch \
             target/x86_64-apple-darwin/release/trainingstagebuch
           ditto -c -k --keepParent "$app" Tagebuch-macos.zip
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          draft: true
-          files: Tagebuch-macos.zip
+          name: paket-macos
+          path: Tagebuch-macos.zip
 
   linux:
     runs-on: ubuntu-latest
@@ -66,7 +67,21 @@ jobs:
           cp crates/journal-app/assets/icon-256.png paket/tagebuch/trainingstagebuch.png
           chmod +x paket/tagebuch/install.sh
           tar -C paket -czf Tagebuch-linux-x64.tar.gz tagebuch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paket-linux
+          path: Tagebuch-linux-x64.tar.gz
+
+  release:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: paket-*
+          path: dist
+          merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: Tagebuch-linux-x64.tar.gz
+          files: dist/*
