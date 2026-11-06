@@ -446,6 +446,8 @@ wenn sich `root_path` ändert, dann wird der aktuelle Tag neu geladen.
 2. **Auto-Save des vorherigen Tages (F9):** Gab es einen Originaltext und weicht der aktuelle
    Editortext davon ab, wird der Text **ohne Rückfrage** in die Datei des *vorherigen* Tages
    geschrieben. Dabei gilt der Schutz beim Speichern aus F16 D.
+   **Neu:** Schlägt das Speichern fehl, bleibt der bisherige Tag offen (Auswahl im Kalender
+   zurücksetzen), und es erscheint eine Meldung mit dem Fehler. So geht nichts verloren.
 3. Der Editor wird mit der **Vorlage** (F8) für den neuen Tag gefüllt.
 4. Existiert `<root>/YYYY-MM-DD.txt`, wird der **komplette** Editorinhalt durch den Dateiinhalt
    ersetzt. Die Vorlage verschwindet dann vollständig.
@@ -514,7 +516,8 @@ Standardwerte für Motto und Übung:
 2. Ist kein `root_path` gesetzt, Ordnerauswahl (F2). Bei Abbruch nichts tun.
 3. Den Editortext **immer** (auch unverändert, also auch die reine Vorlage) nach
    `<root>/YYYY-MM-DD.txt` des Originaldatums schreiben und eine vorhandene Datei überschreiben.
-4. Den Tag neu laden (F7, ohne Auto-Save). Damit gilt der gespeicherte Stand als Originaltext.
+4. Der gespeicherte Stand gilt als Originaltext und Plattenstand. **Abweichung von C#:** Der Tag
+   wird nicht neu geladen, der Cursor bleibt also, wo er ist (in C# sprang er ans Textende).
 5. Der Kalender aktualisiert sich über die Ordnerüberwachung (F5), nicht direkt.
 
 > **Neu (E5):** Vor dem Schreiben gilt der Schutz aus F16 D (Plattenstand prüfen, bei Abweichung
@@ -565,7 +568,8 @@ endgültig gelöscht.
 
 > **Hinweis Ist-Verhalten:** Ungespeicherte Änderungen werden dabei in den **neuen** Ordner
 > geschrieben. Ursache: Der Auto-Save in F7 nutzt den bereits geänderten Pfad.
-> **Empfehlung:** Vor dem Ordnerwechsel im **alten** Ordner speichern.
+> **Entschieden:** Vor dem Ordnerwechsel wird im **alten** Ordner gespeichert. Schlägt das fehl,
+> bleibt der alte Ordner aktiv.
 
 ### F14 – Externer Link (entfällt, Entscheidung E9)
 - In der C#-Version steht unten rechts ein Link auf `http://www.joesgoals.com`.
@@ -792,7 +796,9 @@ Speichern (F10), Beenden (F15) und „Meine Version speichern“):
     aus Kap. 5/F4 und 10),
   - `template` (F8),
   - `watcher` (F5),
-  - `sync` (F16: Plattenstand, Konflikterkennung, Konfliktkopie, als reine Logik testbar),
+  - `sync` (F16: Konfliktzustand, Konfliktkopie),
+  - `dokument` (F7, F9–F13, F15, F16: offener Tag mit Originaltext und Plattenstand, als reine
+    Logik ohne GUI testbar),
   - `ui`.
 
 ## 12. Plattformen

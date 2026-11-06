@@ -5,6 +5,7 @@
 pub mod badge;
 pub mod config;
 pub mod de;
+pub mod dokument;
 pub mod index;
 pub mod storage;
 pub mod sync;
