@@ -166,6 +166,28 @@ fn zelle_im_nachbarmonat_blaettert() {
 }
 
 #[test]
+fn design_umschalten_wird_gespeichert() {
+    let u = Umgebung::neu(&[]);
+    let mut h = u.app();
+    assert!(!(h.ctx.theme() == egui::Theme::Dark));
+    h.get_by_label("🌙").click();
+    h.run_steps(2);
+    assert!((h.ctx.theme() == egui::Theme::Dark));
+    let datei = fs::read_to_string(u.konfig.path().join("config.toml")).unwrap();
+    assert!(datei.contains("design = \"dunkel\""), "{datei}");
+
+    h.get_by_label("☀").click();
+    h.run_steps(2);
+    assert!(!(h.ctx.theme() == egui::Theme::Dark));
+    assert_eq!(
+        config::laden(&u.konfig.path().join("config.toml"))
+            .config
+            .design,
+        config::Design::Hell
+    );
+}
+
+#[test]
 fn heute_knopf_springt_zurueck() {
     let u = Umgebung::neu(&[]);
     let mut h = u.app();

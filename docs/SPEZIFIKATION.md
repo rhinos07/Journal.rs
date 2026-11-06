@@ -463,9 +463,13 @@ auf jeden Inhalt passen würde.
 >
 > Weitere Ergänzungen der Rust-Version:
 >
-> - **Hell und dunkel:** Die App folgt dem Design des Betriebssystems. Für das dunkle Design gibt
->   es einen eigenen Farbsatz (Akzent `#3B82F6`, ausgewählt `#1E2B45`, Wochenende `#212327`), bei
->   den Pills sind Fläche und Schrift vertauscht. Die Konfliktleiste hat ebenfalls zwei Farbsätze.
+> - **Hell und dunkel:** Standardmäßig folgt die App dem Design des Betriebssystems. Drei Knöpfe
+>   unten rechts (💻 System, ☀ Hell, 🌙 Dunkel) schalten um, die Wahl steht als
+>   `design = "system" | "hell" | "dunkel"` in `config.toml` (wird wie `root_path` gezielt
+>   geändert, Kommentare bleiben erhalten; ein unbekannter Wert ergibt eine Warnung und
+>   „system“). Für das dunkle Design gibt es einen eigenen Farbsatz (Akzent `#3B82F6`, ausgewählt
+>   `#1E2B45`, Wochenende `#212327`), bei den Pills sind Fläche und Schrift vertauscht. Die
+>   Konfliktleiste hat ebenfalls zwei Farbsätze.
 > - **„Heute“-Knopf** rechts in der Kopfzeile des Kalenders: wählt den heutigen Tag und zeigt
 >   dessen Monat, aus jeder Ansicht heraus (wie `Alt+Pos1`).
 > - **Zähler** unter der Monatsansicht: „Keine Einträge / 1 Eintrag / n Einträge im <Monat>“,

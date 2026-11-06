@@ -2,8 +2,8 @@
 //!
 //! - [`parse`] liest einen TOML-Text und füllt fehlende Schlüssel mit den Standardwerten.
 //! - [`laden`] liest die Datei vom Platz und legt sie bei Bedarf mit [`STANDARD_CONFIG`] an.
-//! - [`Geladen::root_path_speichern`] ändert gezielt nur `root_path`, Kommentare und
-//!   Formatierung bleiben erhalten.
+//! - [`Geladen::root_path_speichern`] und [`Geladen::design_speichern`] ändern gezielt nur ihren
+//!   Schlüssel, Kommentare und Formatierung bleiben erhalten.
 
 use std::fmt;
 use std::fs;
@@ -19,6 +19,10 @@ use crate::template::Template;
 /// Inhalt der Datei, die beim ersten Start angelegt wird (Kap. 4.2).
 pub const STANDARD_CONFIG: &str = r#"# Journal-Ordner (wird von der App beim Ordnerwechsel gesetzt)
 root_path = ""
+
+# Design: "system" (wie das Betriebssystem), "hell" oder "dunkel".
+# Lässt sich auch unten rechts in der App umschalten.
+design = "system"
 
 # Keine Kürzel gewünscht? Dann alle [[regel]]-Blöcke unten löschen und hier,
 # also VOR der Zeile [template], diese Zeile eintragen:
@@ -133,6 +137,7 @@ woerter = ["krank"]
 pub struct Config {
     /// Journal-Ordner. `None`, wenn leer. Ob er existiert, prüft [`Config::gueltiger_root`].
     pub root_path: Option<PathBuf>,
+    pub design: Design,
     pub template: Template,
     /// Gültige Kürzel-Regeln in Datei-Reihenfolge.
     pub regeln: Vec<Regel>,
@@ -159,6 +164,35 @@ pub struct Geparst {
 }
 
 /// Die Datei ist kein gültiges TOML oder hat falsche Typen.
+/// Helles oder dunkles Erscheinungsbild der App.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Design {
+    /// Wie das Betriebssystem.
+    #[default]
+    System,
+    Hell,
+    Dunkel,
+}
+
+impl Design {
+    pub const ALLE: [Design; 3] = [Design::System, Design::Hell, Design::Dunkel];
+
+    /// Wert in `config.toml`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Design::System => "system",
+            Design::Hell => "hell",
+            Design::Dunkel => "dunkel",
+        }
+    }
+
+    fn aus_name(name: &str) -> Option<Design> {
+        Design::ALLE
+            .into_iter()
+            .find(|d| d.name().eq_ignore_ascii_case(name.trim()))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigFehler {
     /// Zeile (ab 1), sofern bekannt.
@@ -265,6 +299,17 @@ impl Geladen {
     /// zwischenzeitliche Änderungen des Benutzers nicht verloren gehen.
     pub fn root_path_speichern(&mut self, root: &Path) -> Result<bool, ConfigFehler> {
         self.config.root_path = Some(root.to_owned());
+        self.wert_speichern("root_path", &root.to_string_lossy())
+    }
+
+    /// Setzt `design` im Speicher und, wenn möglich, in der Datei. Rückgabe wie bei
+    /// [`Geladen::root_path_speichern`].
+    pub fn design_speichern(&mut self, design: Design) -> Result<bool, ConfigFehler> {
+        self.config.design = design;
+        self.wert_speichern("design", design.name())
+    }
+
+    fn wert_speichern(&self, schluessel: &str, wert: &str) -> Result<bool, ConfigFehler> {
         if !self.beschreibbar {
             return Ok(false);
         }
@@ -277,7 +322,7 @@ impl Geladen {
             Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
             Err(e) => return Err(io_fehler(e)),
         };
-        let neu = root_path_setzen(&text, root)?;
+        let neu = wert_setzen(&text, schluessel, wert)?;
         if let Some(ordner) = self.pfad.parent() {
             fs::create_dir_all(ordner).map_err(io_fehler)?;
         }
@@ -286,8 +331,8 @@ impl Geladen {
     }
 }
 
-/// Setzt `root_path` in einem TOML-Text und lässt alles andere unverändert.
-fn root_path_setzen(text: &str, root: &Path) -> Result<String, ConfigFehler> {
+/// Setzt einen Schlüssel der obersten Ebene in einem TOML-Text und lässt alles andere unverändert.
+fn wert_setzen(text: &str, schluessel: &str, wert: &str) -> Result<String, ConfigFehler> {
     let (bom, inhalt) = match text.strip_prefix('\u{feff}') {
         Some(rest) => ("\u{feff}", rest),
         None => ("", text),
@@ -299,14 +344,13 @@ fn root_path_setzen(text: &str, root: &Path) -> Result<String, ConfigFehler> {
                 zeile: e.span().map(|s| zeile_von(inhalt, s.start)),
                 meldung: e.message().trim().to_owned(),
             })?;
-    let wert = root.to_string_lossy();
-    match doc.get_mut("root_path").and_then(|i| i.as_value_mut()) {
+    match doc.get_mut(schluessel).and_then(|i| i.as_value_mut()) {
         Some(v) => {
             let dekor = v.decor().clone();
-            *v = toml_edit::Value::from(wert.as_ref());
+            *v = toml_edit::Value::from(wert);
             *v.decor_mut() = dekor;
         }
-        None => doc["root_path"] = toml_edit::value(wert.as_ref()),
+        None => doc[schluessel] = toml_edit::value(wert),
     }
     Ok(format!("{bom}{doc}"))
 }
@@ -325,6 +369,7 @@ fn zeile_von(text: &str, byte: usize) -> usize {
 #[derive(Debug, Default, Deserialize)]
 struct Roh {
     root_path: Option<String>,
+    design: Option<String>,
     template: Option<RohTemplate>,
     regel: Option<Vec<RohRegel>>,
 }
@@ -416,8 +461,19 @@ fn aus_roh(roh: &Roh, warnungen: &mut Vec<String>) -> Config {
         .filter(|p| !p.is_empty())
         .map(PathBuf::from);
 
+    let design = match roh.design.as_deref() {
+        None => Design::default(),
+        Some(name) => Design::aus_name(name).unwrap_or_else(|| {
+            warnungen.push(format!(
+                "design = \"{name}\" ist unbekannt, erlaubt sind \"system\", \"hell\" und \"dunkel\"."
+            ));
+            Design::default()
+        }),
+    };
+
     Config {
         root_path,
+        design,
         template,
         regeln,
     }
@@ -568,6 +624,52 @@ ausser  = [""]
     }
 
     #[test]
+    fn design_lesen() {
+        assert_eq!(parse("").unwrap().config.design, Design::System);
+        assert_eq!(
+            parse(
+                "design = 'Dunkel'
+"
+            )
+            .unwrap()
+            .config
+            .design,
+            Design::Dunkel
+        );
+        let g = parse(
+            "design = 'lila'
+",
+        )
+        .unwrap();
+        assert_eq!(g.config.design, Design::System);
+        assert_eq!(g.warnungen.len(), 1);
+        assert_eq!(Config::default().design, Design::System);
+    }
+
+    #[test]
+    fn design_speichern_ergaenzt_alte_datei() {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("config.toml");
+        // Ältere Datei ohne `design`, mit Tabellen danach.
+        fs::write(
+            &pfad,
+            "root_path = 'x'
+
+[template]
+lines = []
+",
+        )
+        .unwrap();
+        let mut g = laden(&pfad);
+        assert_eq!(g.design_speichern(Design::Hell), Ok(true));
+        assert_eq!(laden(&pfad).config.design, Design::Hell);
+        assert_eq!(g.design_speichern(Design::Dunkel), Ok(true));
+        let text = fs::read_to_string(&pfad).unwrap();
+        assert!(text.contains("design = \"dunkel\""), "{text}");
+        assert!(text.find("design").unwrap() < text.find("[template]").unwrap());
+    }
+
+    #[test]
     fn t19_datei_fehlt_wird_angelegt() {
         let dir = tempfile::tempdir().unwrap();
         let pfad = dir.path().join("unter").join("config.toml");
@@ -630,7 +732,7 @@ ausser  = [""]
 
     #[test]
     fn root_path_fehlt_wird_oben_eingefuegt() {
-        let neu = root_path_setzen("[template]\nlines = []\n", Path::new("/j")).unwrap();
+        let neu = wert_setzen("[template]\nlines = []\n", "root_path", "/j").unwrap();
         let g = parse(&neu).unwrap();
         assert_eq!(g.config.root_path, Some(PathBuf::from("/j")));
         assert!(g.config.template.lines.is_empty());
@@ -639,7 +741,7 @@ ausser  = [""]
 
     #[test]
     fn root_path_mit_bom_bleibt_bom() {
-        let neu = root_path_setzen("\u{feff}root_path = ''\n", Path::new("x")).unwrap();
+        let neu = wert_setzen("\u{feff}root_path = ''\n", "root_path", "x").unwrap();
         assert!(neu.starts_with('\u{feff}'));
         assert_eq!(
             parse(&neu).unwrap().config.root_path,

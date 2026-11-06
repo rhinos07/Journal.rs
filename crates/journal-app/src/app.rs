@@ -16,7 +16,7 @@ use eframe::egui::{
     text::{CCursor, CCursorRange},
     text_edit::TextEditState,
 };
-use journal_core::config::{self, Geladen};
+use journal_core::config::{self, Design, Geladen};
 use journal_core::dokument::{Cursor, Dokument, LoeschSchritt, RUECKFRAGE_ENDGUELTIG, Wirkung};
 use journal_core::index::{Index, IndexCache};
 use journal_core::storage::LoeschFehler;
@@ -230,9 +230,9 @@ pub struct TagebuchApp {
 
 impl TagebuchApp {
     pub fn new(ctx: &egui::Context, start: Start) -> Self {
-        // Hell oder dunkel wie das Betriebssystem; Kalender und Konfliktleiste haben je einen
-        // Farbsatz.
-        ctx.set_theme(egui::ThemePreference::System);
+        // Hell, dunkel oder wie das Betriebssystem (`design` in config.toml); Kalender und
+        // Konfliktleiste haben je einen Farbsatz.
+        ctx.set_theme(theme(start.config.config.design));
 
         let heute = start.heute.unwrap_or_else(|| Local::now().date_naive());
         let mut doc = Dokument::new(start.config.config.template.clone(), None);
@@ -619,12 +619,44 @@ impl TagebuchApp {
                 }
                 (None, None) => None,
             };
-            if let Some(text) = text {
-                ui.add_space(8.0);
-                ui.add(egui::Label::new(RichText::new(text).weak()).truncate());
-            }
+            // Rechts die Design-Knöpfe, davor (rechtsbündig, notfalls gekürzt) der Hinweis.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                self.design_knoepfe(ui);
+                if let Some(text) = text {
+                    ui.add_space(8.0);
+                    ui.add(egui::Label::new(RichText::new(text).weak()).truncate());
+                }
+            });
         });
         ui.add_space(4.0);
+    }
+
+    /// Drei Knöpfe System / Hell / Dunkel. In umgekehrter Reihenfolge, weil die Leiste hier von
+    /// rechts nach links gefüllt wird.
+    fn design_knoepfe(&mut self, ui: &mut egui::Ui) {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        let aktuell = self.config.config.design;
+        for design in Design::ALLE.into_iter().rev() {
+            let (symbol, hilfe) = match design {
+                Design::System => ("💻", "Design wie das Betriebssystem"),
+                Design::Hell => ("☀", "Helles Design"),
+                Design::Dunkel => ("🌙", "Dunkles Design"),
+            };
+            if ui
+                .selectable_label(design == aktuell, symbol)
+                .on_hover_text(hilfe)
+                .clicked()
+                && design != aktuell
+            {
+                ui.ctx().set_theme(theme(design));
+                if let Err(e) = self.config.design_speichern(design) {
+                    self.meldung(format!(
+                        "Das Design konnte nicht in der Konfiguration gespeichert werden:
+{e}"
+                    ));
+                }
+            }
+        }
     }
 
     fn konflikt_leiste(&mut self, ui: &mut egui::Ui) {
@@ -780,6 +812,14 @@ impl eframe::App for TagebuchApp {
 }
 
 /// Zeile und Spalte (beide ab 0, in Zeichen) eines Zeichenindex.
+fn theme(design: Design) -> egui::ThemePreference {
+    match design {
+        Design::System => egui::ThemePreference::System,
+        Design::Hell => egui::ThemePreference::Light,
+        Design::Dunkel => egui::ThemePreference::Dark,
+    }
+}
+
 fn zeile_spalte(text: &str, zeichen: usize) -> (usize, usize) {
     let (mut zeile, mut spalte) = (0, 0);
     for c in text.chars().take(zeichen) {

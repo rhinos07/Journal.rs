@@ -53,7 +53,7 @@ Das App-Icon erzeugt `cargo run -p journal-app --example icon` neu (`crates/jour
 - macOS: `~/Library/Application Support/Trainingstagebuch/config.toml`
 - Linux: `~/.config/trainingstagebuch/config.toml`
 
-Sie wird beim ersten Start mit Kommentaren angelegt. Darin stehen der Journal-Ordner, die Vorlage
+Sie wird beim ersten Start mit Kommentaren angelegt. Darin stehen der Journal-Ordner, das Design, die Vorlage
 für neue Tage (Motto und Übung je Wochentag) und die Kürzel-Regeln. Änderungen wirken nach einem
 Neustart (Spezifikation Kap. 4).
 
@@ -67,7 +67,9 @@ Neustart (Spezifikation Kap. 4).
 | `Alt+Pos1` oder Knopf „Heute“ | Heute |
 | Klick auf den Monatstitel | Jahresansicht, noch ein Klick: Jahrzehnt |
 
-Die App folgt dem hellen oder dunklen Design des Betriebssystems.
+Die App folgt dem hellen oder dunklen Design des Betriebssystems. Unten rechts lässt es sich fest
+auf hell (☀) oder dunkel (🌙) stellen oder zurück auf „wie das System“ (💻), die Wahl wird in
+`config.toml` gespeichert.
 
 Gespeichert wird automatisch beim Tageswechsel, nach 5 Sekunden ohne Tastendruck und beim
 Schließen. Ändert ein anderes Gerät den offenen Eintrag, lädt die App ihn neu oder zeigt bei
