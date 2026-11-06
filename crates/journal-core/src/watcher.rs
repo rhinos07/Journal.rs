@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::NaiveDate;
+use notify_debouncer_full::notify::event::ModifyKind;
 use notify_debouncer_full::notify::{EventKind, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
 
@@ -115,13 +116,24 @@ fn auswerten(root: &Path, ergebnis: DebounceEventResult) -> Aenderung {
             };
             if let Some((datum, _)) = storage::klassifiziere(name) {
                 aenderung.tage.insert(datum);
-            } else if ist_root(root, pfad) {
+            } else if ordner_weg(&ereignis.kind) && ist_root(root, pfad) {
                 // Der Ordner selbst wurde verschoben, gelöscht o. Ä.
                 aenderung.unbekannt = true;
             }
         }
     }
     aenderung
+}
+
+/// Kann das Ereignis bedeuten, dass der Ordner selbst verschwunden ist? Anlegen und Ändern des
+/// Ordners zählen nicht: macOS meldet z. B. direkt nach dem Start ein Ereignis für den Ordner
+/// selbst, und Inhaltsänderungen ändern auch die Metadaten des Ordners. Unklare Arten zählen.
+fn ordner_weg(art: &EventKind) -> bool {
+    match art {
+        EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_)) => true,
+        EventKind::Any | EventKind::Other => true,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Access(_) => false,
+    }
 }
 
 fn ist_root(root: &Path, pfad: &Path) -> bool {
@@ -231,7 +243,9 @@ mod tests {
     fn auswerten_ohne_dateisystem() {
         use notify_debouncer_full::DebouncedEvent;
         use notify_debouncer_full::notify::Event;
-        use notify_debouncer_full::notify::event::{AccessKind, CreateKind};
+        use notify_debouncer_full::notify::event::{
+            AccessKind, CreateKind, MetadataKind, RemoveKind, RenameMode,
+        };
 
         let root = Path::new("/journal");
         let ereignis = |kind, name: &str| {
@@ -255,6 +269,27 @@ mod tests {
         assert!(!a.betrifft(d(2026, 11, 9)));
 
         assert!(auswerten(root, Err(vec![])).unbekannt);
+
+        // Ereignisse am Ordner selbst: nur Verschwinden ist „unbekannt“ (macOS meldet auch das
+        // Anlegen und Metadaten-Änderungen des Ordners).
+        let am_ordner = |kind| {
+            auswerten(
+                root,
+                Ok(vec![DebouncedEvent::new(
+                    Event::new(kind).add_path(root.to_owned()),
+                    std::time::Instant::now(),
+                )]),
+            )
+            .unbekannt
+        };
+        assert!(!am_ordner(EventKind::Create(CreateKind::Folder)));
+        assert!(!am_ordner(EventKind::Modify(ModifyKind::Metadata(
+            MetadataKind::Any
+        ))));
+        assert!(am_ordner(EventKind::Remove(RemoveKind::Folder)));
+        assert!(am_ordner(EventKind::Modify(ModifyKind::Name(
+            RenameMode::Any
+        ))));
     }
 
     #[test]
