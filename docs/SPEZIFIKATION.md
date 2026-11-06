@@ -460,6 +460,16 @@ auf jeden Inhalt passen würde.
 > zusammengefasst, mindestens ein Kürzel ist immer sichtbar. Ein Eintrag ohne Kürzel („Datei
 > vorhanden“) wird als grauer Punkt gezeigt. In Jahres- und Jahrzehntansicht ist das aktuelle
 > Feld Akzent-farbig mit Punkt darunter, das angezeigte Feld wie „ausgewählt“.
+>
+> Weitere Ergänzungen der Rust-Version:
+>
+> - **Hell und dunkel:** Die App folgt dem Design des Betriebssystems. Für das dunkle Design gibt
+>   es einen eigenen Farbsatz (Akzent `#3B82F6`, ausgewählt `#1E2B45`, Wochenende `#212327`), bei
+>   den Pills sind Fläche und Schrift vertauscht. Die Konfliktleiste hat ebenfalls zwei Farbsätze.
+> - **„Heute“-Knopf** rechts in der Kopfzeile des Kalenders: wählt den heutigen Tag und zeigt
+>   dessen Monat, aus jeder Ansicht heraus (wie `Alt+Pos1`).
+> - **Zähler** unter der Monatsansicht: „Keine Einträge / 1 Eintrag / n Einträge im <Monat>“,
+>   gezählt werden die Tagesdateien des angezeigten Monats.
 
   Die Farben sind **KANN**. Wichtig ist nur, dass „heute“, „ausgewählt“, „anderer Monat“ und
   „Datei vorhanden“ klar unterscheidbar sind.

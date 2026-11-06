@@ -43,6 +43,10 @@ impl Umgebung {
 
     /// App mit „heute“ = Freitag, 6.11.2026, Fenster 500 × 600 wie in der Spezifikation.
     fn app(&self) -> Harness<'static, TagebuchApp> {
+        self.app_mit(egui::Theme::Light)
+    }
+
+    fn app_mit(&self, theme: egui::Theme) -> Harness<'static, TagebuchApp> {
         let start = Start {
             config: config::laden(&self.konfig.path().join("config.toml")),
             root: Some(self.journal.path().to_owned()),
@@ -52,7 +56,7 @@ impl Umgebung {
         };
         let mut h = Harness::builder()
             .with_size([500.0, 600.0])
-            .with_theme(egui::Theme::Light)
+            .with_theme(theme)
             .build_eframe(|cc| TagebuchApp::new(&cc.egui_ctx, start));
         warte_auf_index(&mut h);
         h
@@ -159,6 +163,20 @@ fn zelle_im_nachbarmonat_blaettert() {
     h.run_steps(2);
     assert_eq!(h.state().doc.datum(), d(2026, 12, 1));
     h.get_by_label("Dezember 2026");
+}
+
+#[test]
+fn heute_knopf_springt_zurueck() {
+    let u = Umgebung::neu(&[]);
+    let mut h = u.app();
+    h.get_by_label("Dienstag, 1. Dezember 2026").click();
+    h.run_steps(2);
+    h.get_by_label("Dezember 2026").click(); // Jahresansicht
+    h.run_steps(2);
+    h.get_by_label("Heute").click();
+    h.run_steps(2);
+    assert_eq!(h.state().doc.datum(), d(2026, 11, 6));
+    h.get_by_label("November 2026");
 }
 
 #[test]
@@ -286,6 +304,11 @@ fn bildschirmfotos() {
 
     h.get_by_label("Löschen").click();
     speichern(&mut h, "5_rueckfrage");
+
+    let mut h = u.app_mit(egui::Theme::Dark);
+    speichern(&mut h, "6_dunkel");
+    h.get_by_label("November 2026").click();
+    speichern(&mut h, "7_dunkel_jahr");
 }
 
 #[test]

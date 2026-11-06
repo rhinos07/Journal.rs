@@ -64,8 +64,10 @@ Neustart (Spezifikation Kap. 4).
 | `Strg+S` (macOS `Cmd+S`) | Speichern |
 | `Alt+←` / `Alt+→` | Vortag / Folgetag |
 | `Alt+↑` / `Alt+↓` | eine Woche zurück / vor |
-| `Alt+Pos1` | Heute |
+| `Alt+Pos1` oder Knopf „Heute“ | Heute |
 | Klick auf den Monatstitel | Jahresansicht, noch ein Klick: Jahrzehnt |
+
+Die App folgt dem hellen oder dunklen Design des Betriebssystems.
 
 Gespeichert wird automatisch beim Tageswechsel, nach 5 Sekunden ohne Tastendruck und beim
 Schließen. Ändert ein anderes Gerät den offenen Eintrag, lädt die App ihn neu oder zeigt bei

@@ -8,77 +8,122 @@ use eframe::egui::{
 use journal_core::de;
 use journal_core::index::Index;
 
-/// Farben des Kalenders: flach, eine Akzentfarbe (Spezifikation F6: Farben sind KANN, wichtig ist
-/// nur die Unterscheidbarkeit von heute, ausgewählt und anderem Monat).
-mod farbe {
-    use eframe::egui::Color32;
-
+/// Farben des Kalenders: flach, eine Akzentfarbe, je ein Satz für helles und dunkles Design
+/// (Spezifikation F6: Farben sind KANN, wichtig ist nur die Unterscheidbarkeit von heute,
+/// ausgewählt und anderem Monat).
+struct Farben {
     /// Akzent für „heute“ und „ausgewählt“.
-    pub const AKZENT: Color32 = Color32::from_rgb(0x25, 0x63, 0xEB);
-    /// Fläche des ausgewählten Tags (Akzent, sehr hell).
-    pub const AUSGEWAEHLT: Color32 = Color32::from_rgb(0xE3, 0xEC, 0xFD);
+    akzent: Color32,
+    /// Fläche des ausgewählten Tags.
+    ausgewaehlt: Color32,
     /// Fläche unter dem Mauszeiger.
-    pub const MAUS: Color32 = Color32::from_rgb(0xEE, 0xF2, 0xF7);
+    maus: Color32,
     /// Leicht abgetönte Fläche für Samstag und Sonntag.
-    pub const WOCHENENDE: Color32 = Color32::from_rgb(0xF3, 0xF5, 0xF8);
-    pub const TEXT: Color32 = Color32::from_rgb(0x1F, 0x29, 0x37);
-    pub const TEXT_LEISE: Color32 = Color32::from_rgb(0x6B, 0x72, 0x80);
-    pub const TEXT_BLASS: Color32 = Color32::from_rgb(0xB4, 0xBB, 0xC6);
-    pub const WARNUNG: Color32 = Color32::from_rgb(0xD9, 0x77, 0x06);
+    wochenende: Color32,
+    text: Color32,
+    text_leise: Color32,
+    text_blass: Color32,
+    warnung: Color32,
+    dunkel: bool,
+}
 
-    /// Gedämpfte Farbpaare (Fläche, Schrift) für die Kürzel-Pills.
-    const PILLS: [(Color32, Color32); 10] = [
-        (
-            Color32::from_rgb(0xDC, 0xF5, 0xE3),
-            Color32::from_rgb(0x16, 0x65, 0x34),
-        ), // grün
-        (
-            Color32::from_rgb(0xDB, 0xEA, 0xFE),
-            Color32::from_rgb(0x1E, 0x40, 0xAF),
-        ), // blau
-        (
-            Color32::from_rgb(0xFF, 0xED, 0xD5),
-            Color32::from_rgb(0x9A, 0x34, 0x12),
-        ), // orange
-        (
-            Color32::from_rgb(0xF3, 0xE8, 0xFF),
-            Color32::from_rgb(0x6B, 0x21, 0xA8),
-        ), // violett
-        (
-            Color32::from_rgb(0xFC, 0xE7, 0xF3),
-            Color32::from_rgb(0x9D, 0x17, 0x4D),
-        ), // pink
-        (
-            Color32::from_rgb(0xCF, 0xFA, 0xFE),
-            Color32::from_rgb(0x15, 0x5E, 0x75),
-        ), // cyan
-        (
-            Color32::from_rgb(0xFE, 0xF3, 0xC7),
-            Color32::from_rgb(0x85, 0x4D, 0x0E),
-        ), // gelb
-        (
-            Color32::from_rgb(0xFE, 0xE2, 0xE2),
-            Color32::from_rgb(0x99, 0x1B, 0x1B),
-        ), // rot
-        (
-            Color32::from_rgb(0xE0, 0xE7, 0xFF),
-            Color32::from_rgb(0x37, 0x30, 0xA3),
-        ), // indigo
-        (
-            Color32::from_rgb(0xEC, 0xFC, 0xCB),
-            Color32::from_rgb(0x3F, 0x62, 0x12),
-        ), // limette
-    ];
+const HELL: Farben = Farben {
+    akzent: Color32::from_rgb(0x25, 0x63, 0xEB),
+    ausgewaehlt: Color32::from_rgb(0xE3, 0xEC, 0xFD),
+    maus: Color32::from_rgb(0xEE, 0xF2, 0xF7),
+    wochenende: Color32::from_rgb(0xF3, 0xF5, 0xF8),
+    text: Color32::from_rgb(0x1F, 0x29, 0x37),
+    text_leise: Color32::from_rgb(0x6B, 0x72, 0x80),
+    text_blass: Color32::from_rgb(0xB4, 0xBB, 0xC6),
+    warnung: Color32::from_rgb(0xD9, 0x77, 0x06),
+    dunkel: false,
+};
 
-    /// Farbpaar für ein Kürzel. Hängt nur vom Kürzel ab (FNV-1a), ist also auf allen Geräten
-    /// und nach jedem Neustart gleich.
-    pub fn pill(kuerzel: &str) -> (Color32, Color32) {
-        let mut h: u32 = 0x811C_9DC5;
-        for b in kuerzel.bytes() {
-            h ^= u32::from(b);
-            h = h.wrapping_mul(0x0100_0193);
+const DUNKEL: Farben = Farben {
+    akzent: Color32::from_rgb(0x3B, 0x82, 0xF6),
+    ausgewaehlt: Color32::from_rgb(0x1E, 0x2B, 0x45),
+    maus: Color32::from_rgb(0x2C, 0x31, 0x3A),
+    wochenende: Color32::from_rgb(0x21, 0x23, 0x27),
+    text: Color32::from_rgb(0xE5, 0xE7, 0xEB),
+    text_leise: Color32::from_rgb(0x9C, 0xA3, 0xAF),
+    text_blass: Color32::from_rgb(0x5B, 0x62, 0x70),
+    warnung: Color32::from_rgb(0xF5, 0x9E, 0x0B),
+    dunkel: true,
+};
+
+/// Gedämpfte Farbpaare (hell, dunkel) für die Kürzel-Pills.
+const PILLS: [(Color32, Color32); 10] = [
+    (
+        Color32::from_rgb(0xDC, 0xF5, 0xE3),
+        Color32::from_rgb(0x16, 0x65, 0x34),
+    ), // grün
+    (
+        Color32::from_rgb(0xDB, 0xEA, 0xFE),
+        Color32::from_rgb(0x1E, 0x40, 0xAF),
+    ), // blau
+    (
+        Color32::from_rgb(0xFF, 0xED, 0xD5),
+        Color32::from_rgb(0x9A, 0x34, 0x12),
+    ), // orange
+    (
+        Color32::from_rgb(0xF3, 0xE8, 0xFF),
+        Color32::from_rgb(0x6B, 0x21, 0xA8),
+    ), // violett
+    (
+        Color32::from_rgb(0xFC, 0xE7, 0xF3),
+        Color32::from_rgb(0x9D, 0x17, 0x4D),
+    ), // pink
+    (
+        Color32::from_rgb(0xCF, 0xFA, 0xFE),
+        Color32::from_rgb(0x15, 0x5E, 0x75),
+    ), // cyan
+    (
+        Color32::from_rgb(0xFE, 0xF3, 0xC7),
+        Color32::from_rgb(0x85, 0x4D, 0x0E),
+    ), // gelb
+    (
+        Color32::from_rgb(0xFE, 0xE2, 0xE2),
+        Color32::from_rgb(0x99, 0x1B, 0x1B),
+    ), // rot
+    (
+        Color32::from_rgb(0xE0, 0xE7, 0xFF),
+        Color32::from_rgb(0x37, 0x30, 0xA3),
+    ), // indigo
+    (
+        Color32::from_rgb(0xEC, 0xFC, 0xCB),
+        Color32::from_rgb(0x3F, 0x62, 0x12),
+    ), // limette
+];
+
+/// Nummer des Farbpaars für ein Kürzel. Hängt nur vom Kürzel ab (FNV-1a), ist also auf allen
+/// Geräten und nach jedem Neustart gleich.
+fn pill_nummer(kuerzel: &str) -> usize {
+    let mut h: u32 = 0x811C_9DC5;
+    for b in kuerzel.bytes() {
+        h ^= u32::from(b);
+        h = h.wrapping_mul(0x0100_0193);
+    }
+    h as usize % PILLS.len()
+}
+
+impl Farben {
+    fn von(ui: &egui::Ui) -> &'static Farben {
+        if ui.visuals().dark_mode {
+            &DUNKEL
+        } else {
+            &HELL
         }
-        PILLS[h as usize % PILLS.len()]
+    }
+
+    /// (Fläche, Schrift) der Pill für ein Kürzel. Im dunklen Design sind die beiden Farben des
+    /// Paars vertauscht.
+    fn pill(&self, kuerzel: &str) -> (Color32, Color32) {
+        let (hell, dunkel) = PILLS[pill_nummer(kuerzel)];
+        if self.dunkel {
+            (dunkel, hell)
+        } else {
+            (hell, dunkel)
+        }
     }
 }
 
@@ -154,6 +199,7 @@ impl Kalender {
         pfeiltasten: bool,
     ) -> Option<NaiveDate> {
         let mut gewaehlt = None;
+        let mut heute_geklickt = false;
 
         ui.horizontal(|ui| {
             if ui.button("◀").on_hover_text("Zurück").clicked() {
@@ -176,6 +222,16 @@ impl Kalender {
                     Ansicht::Jahr | Ansicht::Jahrzehnt => Ansicht::Jahrzehnt,
                 };
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button("Heute")
+                    .on_hover_text("Zum heutigen Tag (Alt+Pos1)")
+                    .clicked()
+                {
+                    self.zeige(heute);
+                    heute_geklickt = true;
+                }
+            });
         });
         ui.add_space(4.0);
 
@@ -183,6 +239,9 @@ impl Kalender {
             Ansicht::Monat => {
                 if pfeiltasten {
                     gewaehlt = pfeil_navigation(ui, ausgewaehlt);
+                }
+                if heute_geklickt {
+                    gewaehlt = Some(heute);
                 }
                 if let Some(d) = self.monat_ui(ui, ausgewaehlt, heute, index) {
                     gewaehlt = Some(d);
@@ -205,6 +264,7 @@ impl Kalender {
         index: &Index,
     ) -> Option<NaiveDate> {
         let breite = ui.available_width();
+        let f = Farben::von(ui);
         let spalte = breite / 7.0;
 
         // Wochentagsnamen, bei schmalen Spalten abgekürzt.
@@ -216,11 +276,12 @@ impl Kalender {
                 Align2::CENTER_CENTER,
                 text,
                 FontId::proportional(12.0),
-                farbe::TEXT_LEISE,
+                f.text_leise,
             );
         }
 
-        let hoehe = ui.available_height().max(6.0 * 40.0);
+        const FUSS: f32 = 18.0;
+        let hoehe = (ui.available_height() - FUSS).max(6.0 * 40.0);
         let (raster, _) = ui.allocate_exact_size(vec2(breite, hoehe), Sense::hover());
         let zeile = hoehe / 6.0;
         let start =
@@ -282,6 +343,15 @@ impl Kalender {
                 gewaehlt = Some(datum);
             }
         }
+
+        let (fuss, _) = ui.allocate_exact_size(vec2(breite, FUSS), Sense::hover());
+        ui.painter().text(
+            fuss.left_center() + vec2(4.0, 0.0),
+            Align2::LEFT_CENTER,
+            eintraege_text(index, self.anzeige),
+            FontId::proportional(12.0),
+            f.text_leise,
+        );
         gewaehlt
     }
 
@@ -319,6 +389,20 @@ impl Kalender {
             self.anzeige = neu;
             self.ansicht = Ansicht::Jahr;
         }
+    }
+}
+
+/// Zeile unter der Monatsansicht, z. B. „14 Einträge im November“.
+fn eintraege_text(index: &Index, monat: NaiveDate) -> String {
+    let ende = monat
+        .checked_add_months(Months::new(1))
+        .unwrap_or(NaiveDate::MAX);
+    let anzahl = index.tage.range(monat..ende).count();
+    let name = de::MONATE[monat.month0() as usize];
+    match anzahl {
+        0 => format!("Keine Einträge im {name}"),
+        1 => format!("1 Eintrag im {name}"),
+        n => format!("{n} Einträge im {name}"),
     }
 }
 
@@ -364,16 +448,17 @@ fn zelle_zeichnen(
     badge: Option<&str>,
     konflikte: usize,
 ) {
+    let f = Farben::von(ui);
     let painter = ui.painter_at(rect.expand(1.0));
     let rund = CornerRadius::same(RUNDUNG);
 
     // Fläche: ausgewählt > Maus > Wochenende, sonst frei.
     let flaeche = if zustand.ausgewaehlt {
-        Some(farbe::AUSGEWAEHLT)
+        Some(f.ausgewaehlt)
     } else if zustand.maus {
-        Some(farbe::MAUS)
+        Some(f.maus)
     } else if zustand.wochenende && !zustand.anderer_monat {
-        Some(farbe::WOCHENENDE)
+        Some(f.wochenende)
     } else {
         None
     };
@@ -381,23 +466,18 @@ fn zelle_zeichnen(
         painter.rect_filled(rect, rund, f);
     }
     if zustand.ausgewaehlt {
-        painter.rect_stroke(
-            rect,
-            rund,
-            Stroke::new(1.5, farbe::AKZENT),
-            StrokeKind::Inside,
-        );
+        painter.rect_stroke(rect, rund, Stroke::new(1.5, f.akzent), StrokeKind::Inside);
     }
 
     // Tageszahl oben links, „heute“ im gefüllten Kreis.
     let mitte = rect.left_top() + vec2(13.0, 12.0);
     let zahl_farbe = if zustand.heute {
-        painter.circle_filled(mitte, 9.5, farbe::AKZENT);
+        painter.circle_filled(mitte, 9.5, f.akzent);
         Color32::WHITE
     } else if zustand.anderer_monat {
-        farbe::TEXT_BLASS
+        f.text_blass
     } else {
-        farbe::TEXT
+        f.text
     };
     painter.text(
         mitte,
@@ -412,7 +492,7 @@ fn zelle_zeichnen(
             Align2::RIGHT_CENTER,
             "⚠",
             FontId::proportional(13.0),
-            farbe::WARNUNG,
+            f.warnung,
         );
     }
 
@@ -424,9 +504,9 @@ fn zelle_zeichnen(
         if badge.trim().is_empty() {
             // Eintrag ohne Kürzel: kleiner Punkt.
             let punkt = if zustand.anderer_monat {
-                farbe::TEXT_BLASS.gamma_multiply(0.6)
+                f.text_blass.gamma_multiply(0.6)
             } else {
-                farbe::TEXT_BLASS
+                f.text_blass
             };
             painter.circle_filled(bereich.left_top() + vec2(10.0, 7.0), 3.5, punkt);
         } else {
@@ -438,6 +518,7 @@ fn zelle_zeichnen(
 /// Kürzel als abgerundete Kapseln, zeilenweise umbrochen. Was nicht passt, wird als „+n“
 /// zusammengefasst (der ganze Text steht im Tooltip der Zelle).
 fn pills_zeichnen(ui: &egui::Ui, bereich: Rect, badge: &str, blass: bool) {
+    let f = Farben::von(ui);
     if bereich.width() < 12.0 || bereich.height() < PILL_HOEHE {
         return;
     }
@@ -473,21 +554,14 @@ fn pills_zeichnen(ui: &egui::Ui, bereich: Rect, badge: &str, blass: bool) {
     for (i, (x, zeile, b)) in plan.into_iter().enumerate() {
         let pos = bereich.left_top() + vec2(x, zeile as f32 * (PILL_HOEHE + PILL_ABSTAND));
         if i < anzahl {
-            let mut farben = farbe::pill(kuerzel[i]);
+            let mut farben = f.pill(kuerzel[i]);
             if blass {
                 farben = (farben.0.gamma_multiply(0.5), farben.1.gamma_multiply(0.5));
             }
             pill(&painter, pos, b, kuerzel[i], farben, &schrift);
         } else {
             let text = format!("+{}", kuerzel.len() - anzahl);
-            pill(
-                &painter,
-                pos,
-                b,
-                &text,
-                (farbe::MAUS, farbe::TEXT_LEISE),
-                &schrift,
-            );
+            pill(&painter, pos, b, &text, (f.maus, f.text_leise), &schrift);
         }
     }
 }
@@ -551,6 +625,7 @@ struct Feld {
 
 /// 4 × 3 Felder für Jahres- und Jahrzehntansicht. Gibt den Index des angeklickten Felds zurück.
 fn raster_ui(ui: &mut egui::Ui, felder: &[Feld]) -> Option<usize> {
+    let farben = Farben::von(ui);
     let groesse = vec2(ui.available_width(), ui.available_height().max(3.0 * 40.0));
     let (raster, _) = ui.allocate_exact_size(groesse, Sense::hover());
     let feld = Vec2::new(raster.width() / 4.0, raster.height() / 3.0);
@@ -566,22 +641,22 @@ fn raster_ui(ui: &mut egui::Ui, felder: &[Feld]) -> Option<usize> {
         let painter = ui.painter();
         let rund = CornerRadius::same(RUNDUNG);
         if f.markiert {
-            painter.rect_filled(rect, rund, farbe::AUSGEWAEHLT);
+            painter.rect_filled(rect, rund, farben.ausgewaehlt);
             painter.rect_stroke(
                 rect,
                 rund,
-                Stroke::new(1.5, farbe::AKZENT),
+                Stroke::new(1.5, farben.akzent),
                 StrokeKind::Inside,
             );
         } else if antwort.hovered() {
-            painter.rect_filled(rect, rund, farbe::MAUS);
+            painter.rect_filled(rect, rund, farben.maus);
         }
         let (schrift, text_farbe) = if f.heute {
-            (FontId::proportional(16.0), farbe::AKZENT)
+            (FontId::proportional(16.0), farben.akzent)
         } else if f.ausgegraut {
-            (FontId::proportional(15.0), farbe::TEXT_BLASS)
+            (FontId::proportional(15.0), farben.text_blass)
         } else {
-            (FontId::proportional(15.0), farbe::TEXT)
+            (FontId::proportional(15.0), farben.text)
         };
         let text_rect = painter.text(
             rect.center(),
@@ -595,7 +670,7 @@ fn raster_ui(ui: &mut egui::Ui, felder: &[Feld]) -> Option<usize> {
             painter.circle_filled(
                 pos2(rect.center().x, text_rect.bottom() + 5.0),
                 2.5,
-                farbe::AKZENT,
+                farben.akzent,
             );
         }
         if antwort.clicked() {
@@ -629,6 +704,31 @@ mod tests {
     }
 
     #[test]
+    fn eintraege_zaehlen() {
+        let mut index = Index::default();
+        let leer = journal_core::index::Tag {
+            badge: None,
+            konflikte: Vec::new(),
+        };
+        assert_eq!(
+            eintraege_text(&index, d(2026, 11, 1)),
+            "Keine Einträge im November"
+        );
+        for t in [d(2026, 10, 31), d(2026, 11, 1), d(2026, 12, 1)] {
+            index.tage.insert(t, leer.clone());
+        }
+        assert_eq!(
+            eintraege_text(&index, d(2026, 11, 1)),
+            "1 Eintrag im November"
+        );
+        index.tage.insert(d(2026, 11, 30), leer);
+        assert_eq!(
+            eintraege_text(&index, d(2026, 11, 1)),
+            "2 Einträge im November"
+        );
+    }
+
+    #[test]
     fn pills_umbrechen() {
         // 3 Kapseln à 20 px in 50 px Breite: zwei in Zeile 0, eine in Zeile 1.
         let plan = anordnen(&[20.0, 20.0, 20.0], 50.0, 2).unwrap();
@@ -638,10 +738,10 @@ mod tests {
 
     #[test]
     fn pill_farbe_haengt_nur_vom_kuerzel_ab() {
-        assert_eq!(farbe::pill("SQ"), farbe::pill("SQ"));
+        assert_eq!(pill_nummer("SQ"), pill_nummer("SQ"));
         let verschieden: std::collections::HashSet<_> = ["SQ", "DL", "BP", "OHP", "Kz", "Jo"]
             .iter()
-            .map(|k| farbe::pill(k))
+            .map(|k| pill_nummer(k))
             .collect();
         assert!(
             verschieden.len() >= 4,

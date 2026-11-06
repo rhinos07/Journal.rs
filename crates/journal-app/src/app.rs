@@ -230,8 +230,9 @@ pub struct TagebuchApp {
 
 impl TagebuchApp {
     pub fn new(ctx: &egui::Context, start: Start) -> Self {
-        // Die Farben von Kalender und Badges sind für einen hellen Hintergrund gemacht.
-        ctx.set_theme(egui::Theme::Light);
+        // Hell oder dunkel wie das Betriebssystem; Kalender und Konfliktleiste haben je einen
+        // Farbsatz.
+        ctx.set_theme(egui::ThemePreference::System);
 
         let heute = start.heute.unwrap_or_else(|| Local::now().date_naive());
         let mut doc = Dokument::new(start.config.config.template.clone(), None);
@@ -632,14 +633,27 @@ impl TagebuchApp {
         };
         let mut extern_laden = false;
         let mut eigene_speichern = false;
+        let (flaeche, rand, schrift) = if ui.visuals().dark_mode {
+            (
+                Color32::from_rgb(0x42, 0x36, 0x0C),
+                Color32::from_rgb(0xA1, 0x80, 0x1E),
+                Color32::from_rgb(0xFD, 0xE6, 0x8A),
+            )
+        } else {
+            (
+                Color32::from_rgb(0xFF, 0xF1, 0xA8),
+                Color32::from_rgb(0xD8, 0xB0, 0x30),
+                Color32::BLACK,
+            )
+        };
         egui::Frame::new()
-            .fill(Color32::from_rgb(0xFF, 0xF1, 0xA8))
-            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(0xD8, 0xB0, 0x30)))
+            .fill(flaeche)
+            .stroke(egui::Stroke::new(1.0, rand))
             .corner_radius(3)
             .inner_margin(6)
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(konflikt.meldung()).color(Color32::BLACK));
+                    ui.label(RichText::new(konflikt.meldung()).color(schrift));
                     extern_laden = ui.button(konflikt.button_extern()).clicked();
                     eigene_speichern = ui.button(konflikt.button_eigen()).clicked();
                 });
