@@ -414,11 +414,14 @@ auf jeden Inhalt passen würde.
   - Der Wechsel der Ansicht ändert den **ausgewählten Tag nicht**, F7 wird also nicht ausgelöst.
   - In Jahres- und Jahrzehntansicht gibt es keine Badges.
   - Hervorgehoben werden der aktuelle Monat bzw. das aktuelle Jahr der Anzeige.
-- Darunter die Wochentagsnamen **ausgeschrieben** („Montag“ … „Sonntag“) in der Sprache des Systems.
+- Darunter die Wochentagsnamen **ausgeschrieben** („Montag“ … „Sonntag“). Ist die Spalte dafür zu
+  schmal (z. B. bei der Startbreite 500 px), werden sie abgekürzt („Mo“ … „So“).
 - **Tageszelle:**
   - oben die Tageszahl,
   - darunter das **Badge**, wenn es für das Datum einen `Entry` gibt: abgerundeter Kasten
     (Radius 4) mit grünem Rahmen `#006000`, Hintergrund `#DFFFF5` und zentriertem Kürzeltext.
+    Passt der Text nicht, steht er linksbündig und wird abgeschnitten; der Tooltip der Zelle zeigt
+    ihn ganz.
   - **Wichtig:** Das Badge erscheint auch bei leerem Kürzeltext. Der grüne Kasten ist der Hinweis
     „Datei vorhanden“.
   - Ohne Eintrag gibt es keinen Kasten.
@@ -694,7 +697,9 @@ Speichern (F10), Beenden (F15) und „Meine Version speichern“):
 - Buttons mit Icons (15 × 15 px) und Tooltips: „Configuration“, „Save this entry“,
   „Undo changes“, „Remove this entry“.
 - Sprache der Oberfläche: gemischt (Tooltips Englisch, Meldungen Deutsch).
-  > **Empfehlung:** Einheitlich Deutsch.
+  > **Entschieden:** Einheitlich Deutsch. Die Buttons sind beschriftet („Ordner…“, „Speichern“,
+  > „Rückgängig“, „Löschen“) statt Icons, mit deutschen Tooltips. Die Statuszeile steht rechts neben
+  > den Buttons.
 
 ## 7. Tastatur
 
@@ -703,9 +708,13 @@ Speichern (F10), Beenden (F15) und „Meine Version speichern“):
 | `Strg+S` | Speichern (F10), fensterweit |
 | Pfeiltasten (Fokus im Kalender) | Tag wechseln (löst F7 aus) |
 | `Strg+Z` / `Strg+Y` (Fokus im Editor) | Undo/Redo des Editors |
+| `Alt+←` / `Alt+→` | Vortag / Folgetag, auch mit Fokus im Editor |
+| `Alt+↑` / `Alt+↓` | eine Woche zurück / vor, auch mit Fokus im Editor |
+| `Alt+Pos1` | Heute, auch mit Fokus im Editor |
 
-> **Empfehlung (KANN):** Tastenkürzel für vorherigen/nächsten Tag und „Heute“, die auch
-> funktionieren, wenn der Editor den Fokus hat. Nach F7 liegt der Fokus nämlich immer im Editor.
+Pfeiltasten ohne `Alt` wechseln den Tag nur, wenn kein Eingabefeld den Fokus hat (Pfeil hoch/runter =
+eine Woche). Nach F7 liegt der Fokus im Editor, deshalb die `Alt`-Varianten. `Strg` heißt unter macOS
+`Cmd`.
 
 ## 8. Nicht übernehmen
 
