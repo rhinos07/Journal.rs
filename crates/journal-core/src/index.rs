@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 use chrono::NaiveDate;
 
@@ -67,6 +67,24 @@ impl IndexCache {
     /// Baut den Index für `root` komplett neu auf (F3). Fehler nur, wenn der Ordner selbst nicht
     /// lesbar ist.
     pub fn aufbauen(&mut self, root: &Path) -> io::Result<Index> {
+        self.aufbauen_mit(root, |_| {})
+    }
+
+    /// Wie [`IndexCache::aufbauen`], meldet aber Zwischenstände, solange Dateien gelesen werden
+    /// müssen:
+    ///
+    /// 1. Gleich nach dem Auflisten des Ordners: Alle Tage mit Datei sind schon enthalten. Tage,
+    ///    deren Inhalt noch gelesen werden muss, haben das zuletzt bekannte oder ein leeres Badge.
+    ///    Dafür wird keine Datei geöffnet (OneDrive lädt also noch nichts herunter).
+    /// 2. Danach etwa alle [`MELDEN_ALLE`] mit den bis dahin gelesenen Badges, die neuesten Tage
+    ///    zuerst.
+    ///
+    /// Muss keine Datei gelesen werden, wird nichts gemeldet. Das Endergebnis ist der Rückgabewert.
+    pub fn aufbauen_mit(
+        &mut self,
+        root: &Path,
+        mut melden: impl FnMut(Zwischenstand<'_>),
+    ) -> io::Result<Index> {
         let mut index = Index::default();
         // Pro Datum die gewählte Tagesdatei und ob ihre Endung klein ist (F3, Punkt 4).
         let mut tagesdateien: BTreeMap<NaiveDate, (PathBuf, bool)> = BTreeMap::new();
@@ -101,7 +119,14 @@ impl IndexCache {
             }
         }
 
+        for tag in index.tage.values_mut() {
+            tag.konflikte.sort();
+        }
+
+        // Phase 1: Nur Metadaten. Unveränderte Dateien kommen aus dem Cache, die anderen werden
+        // für Phase 2 vorgemerkt.
         let mut neu = HashMap::with_capacity(tagesdateien.len());
+        let mut zu_lesen = Vec::new();
         for (datum, (pfad, _)) in tagesdateien {
             let alt = self.dateien.remove(&pfad);
             let badge = match stand(&pfad) {
@@ -110,25 +135,64 @@ impl IndexCache {
                         neu.insert(pfad, (s, badge.clone()));
                         badge
                     }
-                    _ => match fs::read(&pfad) {
-                        Ok(bytes) => {
-                            let b = badge(&storage::text_aus_bytes(&bytes), &self.regeln);
-                            neu.insert(pfad, (s, b.clone()));
-                            b
-                        }
-                        Err(e) => lesefehler(&mut index, &mut neu, pfad, alt, e),
-                    },
+                    alt => {
+                        let vorlaeufig = alt.as_ref().map(|(_, b)| b.clone()).unwrap_or_default();
+                        zu_lesen.push((datum, pfad, s, alt));
+                        vorlaeufig
+                    }
                 },
                 Err(e) => lesefehler(&mut index, &mut neu, pfad, alt, e),
             };
             index.tage.entry(datum).or_default().badge = Some(badge);
         }
-        for tag in index.tage.values_mut() {
-            tag.konflikte.sort();
+
+        // Phase 2: Inhalte lesen, neueste Tage zuerst.
+        let gesamt = zu_lesen.len();
+        if gesamt > 0 {
+            melden(Zwischenstand {
+                index: &index,
+                gelesen: 0,
+                gesamt,
+            });
         }
+        let mut zuletzt_gemeldet = Instant::now();
+        for (nr, (datum, pfad, s, alt)) in zu_lesen.into_iter().rev().enumerate() {
+            let badge = match fs::read(&pfad) {
+                Ok(bytes) => {
+                    let b = badge(&storage::text_aus_bytes(&bytes), &self.regeln);
+                    neu.insert(pfad, (s, b.clone()));
+                    b
+                }
+                Err(e) => lesefehler(&mut index, &mut neu, pfad, alt, e),
+            };
+            index.tage.entry(datum).or_default().badge = Some(badge);
+            if zuletzt_gemeldet.elapsed() >= MELDEN_ALLE && nr + 1 < gesamt {
+                melden(Zwischenstand {
+                    index: &index,
+                    gelesen: nr + 1,
+                    gesamt,
+                });
+                zuletzt_gemeldet = Instant::now();
+            }
+        }
+
         self.dateien = neu;
         Ok(index)
     }
+}
+
+/// Abstand der Zwischenstände von [`IndexCache::aufbauen_mit`].
+pub const MELDEN_ALLE: Duration = Duration::from_millis(250);
+
+/// Zwischenstand eines laufenden Index-Aufbaus.
+#[derive(Debug, Clone, Copy)]
+pub struct Zwischenstand<'a> {
+    /// Alle Tage mit Datei; noch nicht gelesene haben ein vorläufiges Badge.
+    pub index: &'a Index,
+    /// Bereits gelesene Dateien.
+    pub gelesen: usize,
+    /// Insgesamt zu lesende Dateien.
+    pub gesamt: usize,
 }
 
 /// Merkt den Fehler und liefert das zuletzt bekannte Badge (oder leer). Der Cache-Eintrag
@@ -314,6 +378,57 @@ mod tests {
             badge_am(&c.aufbauen(dir.path()).unwrap(), d(2026, 11, 10)),
             Some("Lauf")
         );
+    }
+
+    #[test]
+    fn zwischenstand_kommt_vor_dem_lesen_mit_allen_tagen() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, inhalt) in [
+            ("2026-11-01.txt", "Joggen"),
+            ("2026-11-02.txt", "Yoga"),
+            ("2026-11-03.txt", "Kniebeugen"),
+        ] {
+            fs::write(dir.path().join(name), inhalt).unwrap();
+        }
+        let mut c = cache();
+        let mut meldungen = Vec::new();
+        let index = c
+            .aufbauen_mit(dir.path(), |z| {
+                meldungen.push((z.index.clone(), z.gelesen, z.gesamt))
+            })
+            .unwrap();
+
+        let (erster, gelesen, gesamt) = &meldungen[0];
+        assert_eq!((*gelesen, *gesamt), (0, 3));
+        assert_eq!(erster.tage.len(), 3, "alle Tage sofort da");
+        assert!(erster.tage.values().all(|t| t.badge.as_deref() == Some("")));
+        assert_eq!(badge_am(&index, d(2026, 11, 1)), Some("Jo"));
+        assert_eq!(badge_am(&index, d(2026, 11, 3)), Some("SQ"));
+
+        // Zweiter Lauf: alles im Cache, nichts zu lesen, keine Meldung.
+        let mut gemeldet = false;
+        let index2 = c.aufbauen_mit(dir.path(), |_| gemeldet = true).unwrap();
+        assert!(!gemeldet);
+        assert_eq!(index2, index);
+    }
+
+    #[test]
+    fn zwischenstand_zeigt_bis_zum_lesen_das_alte_badge() {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("2026-11-01.txt");
+        fs::write(&pfad, "Joggen").unwrap();
+        let mut c = cache();
+        c.aufbauen(dir.path()).unwrap();
+        fs::write(&pfad, "Joggen und Yoga").unwrap();
+
+        let mut vorlaeufig = None;
+        let index = c
+            .aufbauen_mit(dir.path(), |z| {
+                vorlaeufig.get_or_insert(badge_am(z.index, d(2026, 11, 1)).map(str::to_owned));
+            })
+            .unwrap();
+        assert_eq!(vorlaeufig, Some(Some("Jo".to_owned())));
+        assert_eq!(badge_am(&index, d(2026, 11, 1)), Some("Jo Yo"));
     }
 
     #[test]

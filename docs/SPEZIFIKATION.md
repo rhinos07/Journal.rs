@@ -308,6 +308,13 @@ Eingabe: `root_path`. Ausgabe: Liste von `Entry`, die die Kalenderanzeige komple
 > App zum Absturz. Den Index im Hintergrund aufbauen, falls der Ordner groß ist (Jahre × 365 Dateien
 > sind unkritisch, aber das Einlesen blockiert in C# die Oberfläche).
 
+**Umgesetzt (Neuimplementierung):** Der Index wird im Hintergrund in zwei Phasen gebaut. Zuerst
+wird nur der Ordner aufgelistet, und alle Tage mit Datei erscheinen sofort als grünes Badge, ohne
+eine Datei zu öffnen. Das ist wichtig bei OneDrive „Dateien bei Bedarf“, wo jedes Lesen die Datei
+herunterlädt. Danach werden die Inhalte gelesen, die neuesten Tage zuerst, und die Kürzel
+erscheinen nach und nach. Die Statuszeile zeigt dabei „Lese Einträge … gelesen / gesamt“.
+Unveränderte Dateien (gleiche Änderungszeit und Größe) werden nicht erneut gelesen.
+
 ### F4 – Kürzel-Erkennung (`parse_badge`)
 Entschieden E3: Die Regeln kommen aus der Konfiguration (`[[regel]]`, Kap. 4.2), und **doppelte
 Kürzel werden entfernt**. Die Erkennung bleibt eine **Teilstring-Suche** ohne Wortgrenzen.

@@ -128,11 +128,26 @@ impl Dialog {
     }
 }
 
+/// Nachricht des Index-Threads.
+enum IndexNachricht {
+    /// Zwischenstand: alle Tage schon da, `gelesen` von `gesamt` Dateien gelesen.
+    Zwischen {
+        root: PathBuf,
+        index: Index,
+        gelesen: usize,
+        gesamt: usize,
+    },
+    Fertig {
+        root: PathBuf,
+        ergebnis: io::Result<Index>,
+    },
+}
+
 /// Baut den Index in einem Hintergrund-Thread (F3, Empfehlung).
 struct IndexBauer {
     cache: Arc<Mutex<IndexCache>>,
-    tx: Sender<(PathBuf, io::Result<Index>)>,
-    rx: Receiver<(PathBuf, io::Result<Index>)>,
+    tx: Sender<IndexNachricht>,
+    rx: Receiver<IndexNachricht>,
     laeuft: bool,
     nochmal: bool,
 }
@@ -165,16 +180,26 @@ impl IndexBauer {
             let ergebnis = cache
                 .lock()
                 .unwrap_or_else(|vergiftet| vergiftet.into_inner())
-                .aufbauen(&root);
-            let _ = tx.send((root, ergebnis));
+                .aufbauen_mit(&root, |z| {
+                    let _ = tx.send(IndexNachricht::Zwischen {
+                        root: root.clone(),
+                        index: z.index.clone(),
+                        gelesen: z.gelesen,
+                        gesamt: z.gesamt,
+                    });
+                    ctx.request_repaint();
+                });
+            let _ = tx.send(IndexNachricht::Fertig { root, ergebnis });
             ctx.request_repaint();
         });
     }
 
-    fn abholen(&mut self) -> Option<(PathBuf, io::Result<Index>)> {
-        let ergebnis = self.rx.try_recv().ok()?;
-        self.laeuft = false;
-        Some(ergebnis)
+    fn abholen(&mut self) -> Option<IndexNachricht> {
+        let nachricht = self.rx.try_recv().ok()?;
+        if matches!(nachricht, IndexNachricht::Fertig { .. }) {
+            self.laeuft = false;
+        }
+        Some(nachricht)
     }
 }
 
@@ -190,6 +215,8 @@ pub struct TagebuchApp {
     aenderung_rx: Receiver<Aenderung>,
     dialoge: VecDeque<Dialog>,
     status: Option<(String, Instant)>,
+    /// `(gelesen, gesamt)`, solange der Index Dateien liest.
+    index_fortschritt: Option<(usize, usize)>,
     cursor_ausstehend: Option<Cursor>,
     /// Zeile und Spalte des Cursors im letzten Frame, für [`Cursor::Behalten`].
     cursor_zeile_spalte: (usize, usize),
@@ -222,6 +249,7 @@ impl TagebuchApp {
             aenderung_rx,
             dialoge: start.meldungen.into_iter().map(Dialog::Meldung).collect(),
             status: None,
+            index_fortschritt: None,
             cursor_ausstehend: None,
             cursor_zeile_spalte: (0, 0),
             letzte_eingabe: None,
@@ -415,8 +443,24 @@ impl TagebuchApp {
     // -- Ereignisse außerhalb der Oberfläche ---------------------------------------------------
 
     fn hintergrund(&mut self, ctx: &egui::Context) {
-        // Fertige Index-Läufe übernehmen.
-        while let Some((root, ergebnis)) = self.bauer.abholen() {
+        // Zwischenstände und fertige Index-Läufe übernehmen.
+        while let Some(nachricht) = self.bauer.abholen() {
+            let (root, ergebnis) = match nachricht {
+                IndexNachricht::Zwischen {
+                    root,
+                    index,
+                    gelesen,
+                    gesamt,
+                } => {
+                    if self.doc.root() == Some(root.as_path()) {
+                        self.index = index;
+                        self.index_fortschritt = Some((gelesen, gesamt));
+                    }
+                    continue;
+                }
+                IndexNachricht::Fertig { root, ergebnis } => (root, ergebnis),
+            };
+            self.index_fortschritt = None;
             if self.doc.root() == Some(root.as_path()) {
                 match ergebnis {
                     Ok(index) => {
@@ -566,7 +610,15 @@ impl TagebuchApp {
             {
                 self.loeschen();
             }
-            if let Some((text, _)) = &self.status {
+            // Hinweise haben Vorrang, sonst der Fortschritt des Index.
+            let text = match (&self.status, self.index_fortschritt) {
+                (Some((text, _)), _) => Some(text.clone()),
+                (None, Some((gelesen, gesamt))) => {
+                    Some(format!("Lese Einträge … {gelesen} / {gesamt}"))
+                }
+                (None, None) => None,
+            };
+            if let Some(text) = text {
                 ui.add_space(8.0);
                 ui.add(egui::Label::new(RichText::new(text).weak()).truncate());
             }

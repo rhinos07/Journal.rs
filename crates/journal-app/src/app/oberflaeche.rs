@@ -287,3 +287,30 @@ fn bildschirmfotos() {
     h.get_by_label("Löschen").click();
     speichern(&mut h, "5_rueckfrage");
 }
+
+#[test]
+fn zwischenstand_des_index_erscheint_sofort_mit_fortschritt() {
+    let u = Umgebung::neu(&[]);
+    let mut h = u.app();
+    let mut index = journal_core::index::Index::default();
+    index.tage.insert(
+        d(2026, 11, 2),
+        journal_core::index::Tag {
+            badge: Some(String::new()),
+            konflikte: Vec::new(),
+        },
+    );
+    h.state()
+        .bauer
+        .tx
+        .send(super::IndexNachricht::Zwischen {
+            root: u.journal.path().to_owned(),
+            index,
+            gelesen: 120,
+            gesamt: 691,
+        })
+        .unwrap();
+    h.run_steps(2);
+    h.get_by_label("Lese Einträge … 120 / 691");
+    h.get_by_label("Montag, 2. November 2026, Eintrag ");
+}
