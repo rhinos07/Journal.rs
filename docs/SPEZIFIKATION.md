@@ -442,6 +442,25 @@ auf jeden Inhalt passen würde.
 | Maus darüber | Hintergrund `#BADDE9` mit 50 % Deckkraft |
 | anderer Monat | Hintergrund `#E9EDF5`, Text `#777777` |
 
+> **Entscheidung (Rust-Version): flacher Stil.** Keine Rahmen, abgerundete Flächen (Radius 8), eine
+> Akzentfarbe `#2563EB`:
+>
+> | Zustand | Darstellung (Rust) |
+> |---|---|
+> | normal | keine Fläche, Tageszahl oben links `#1F2937` |
+> | Wochenende | Fläche `#F3F5F8` (nur im angezeigten Monat) |
+> | heute | Tageszahl weiß im gefüllten Kreis `#2563EB` |
+> | ausgewählt | Fläche `#E3ECFD`, Rand `#2563EB` 1,5 px |
+> | Maus darüber | Fläche `#EEF2F7` |
+> | anderer Monat | Tageszahl `#B4BBC6`, Kürzel blasser |
+>
+> Das Badge wird in seine Kürzel zerlegt, jedes Kürzel ist eine eigene Kapsel („Pill“). Die Farbe
+> ergibt sich automatisch aus dem Kürzel (FNV-1a-Hash auf zehn gedämpfte Farbpaare) und ist damit
+> auf allen Geräten gleich. Die Pills brechen um, was nicht in die Zelle passt, wird zu „+n“
+> zusammengefasst, mindestens ein Kürzel ist immer sichtbar. Ein Eintrag ohne Kürzel („Datei
+> vorhanden“) wird als grauer Punkt gezeigt. In Jahres- und Jahrzehntansicht ist das aktuelle
+> Feld Akzent-farbig mit Punkt darunter, das angezeigte Feld wie „ausgewählt“.
+
   Die Farben sind **KANN**. Wichtig ist nur, dass „heute“, „ausgewählt“, „anderer Monat“ und
   „Datei vorhanden“ klar unterscheidbar sind.
 - Es ist **genau ein Tag** ausgewählt (Einzelauswahl). Ein Klick auf einen Tag aus dem Nachbarmonat

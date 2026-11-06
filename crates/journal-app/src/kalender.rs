@@ -8,20 +8,78 @@ use eframe::egui::{
 use journal_core::de;
 use journal_core::index::Index;
 
-/// Farben aus der C#-Version (F6). Sie sind KANN, wichtig ist nur die Unterscheidbarkeit.
+/// Farben des Kalenders: flach, eine Akzentfarbe (Spezifikation F6: Farben sind KANN, wichtig ist
+/// nur die Unterscheidbarkeit von heute, ausgewählt und anderem Monat).
 mod farbe {
     use eframe::egui::Color32;
 
-    pub const KOPF: Color32 = Color32::from_rgb(0xDF, 0xE8, 0xF5);
-    pub const RAHMEN: Color32 = Color32::from_rgb(0x5D, 0x8C, 0xC9);
-    pub const HEUTE_KOPF: Color32 = Color32::from_rgb(0xF7, 0xD2, 0x75);
-    pub const HEUTE_RAHMEN: Color32 = Color32::from_rgb(0xF3, 0xB8, 0x4B);
-    pub const AUSGEWAEHLT: Color32 = Color32::from_rgb(0xBA, 0xDD, 0xE9);
-    pub const ANDERER_MONAT: Color32 = Color32::from_rgb(0xE9, 0xED, 0xF5);
-    pub const ANDERER_TEXT: Color32 = Color32::from_rgb(0x77, 0x77, 0x77);
-    pub const BADGE_RAHMEN: Color32 = Color32::from_rgb(0x00, 0x60, 0x00);
-    pub const BADGE: Color32 = Color32::from_rgb(0xDF, 0xFF, 0xF5);
-    pub const WARNUNG: Color32 = Color32::from_rgb(0xC0, 0x60, 0x00);
+    /// Akzent für „heute“ und „ausgewählt“.
+    pub const AKZENT: Color32 = Color32::from_rgb(0x25, 0x63, 0xEB);
+    /// Fläche des ausgewählten Tags (Akzent, sehr hell).
+    pub const AUSGEWAEHLT: Color32 = Color32::from_rgb(0xE3, 0xEC, 0xFD);
+    /// Fläche unter dem Mauszeiger.
+    pub const MAUS: Color32 = Color32::from_rgb(0xEE, 0xF2, 0xF7);
+    /// Leicht abgetönte Fläche für Samstag und Sonntag.
+    pub const WOCHENENDE: Color32 = Color32::from_rgb(0xF3, 0xF5, 0xF8);
+    pub const TEXT: Color32 = Color32::from_rgb(0x1F, 0x29, 0x37);
+    pub const TEXT_LEISE: Color32 = Color32::from_rgb(0x6B, 0x72, 0x80);
+    pub const TEXT_BLASS: Color32 = Color32::from_rgb(0xB4, 0xBB, 0xC6);
+    pub const WARNUNG: Color32 = Color32::from_rgb(0xD9, 0x77, 0x06);
+
+    /// Gedämpfte Farbpaare (Fläche, Schrift) für die Kürzel-Pills.
+    const PILLS: [(Color32, Color32); 10] = [
+        (
+            Color32::from_rgb(0xDC, 0xF5, 0xE3),
+            Color32::from_rgb(0x16, 0x65, 0x34),
+        ), // grün
+        (
+            Color32::from_rgb(0xDB, 0xEA, 0xFE),
+            Color32::from_rgb(0x1E, 0x40, 0xAF),
+        ), // blau
+        (
+            Color32::from_rgb(0xFF, 0xED, 0xD5),
+            Color32::from_rgb(0x9A, 0x34, 0x12),
+        ), // orange
+        (
+            Color32::from_rgb(0xF3, 0xE8, 0xFF),
+            Color32::from_rgb(0x6B, 0x21, 0xA8),
+        ), // violett
+        (
+            Color32::from_rgb(0xFC, 0xE7, 0xF3),
+            Color32::from_rgb(0x9D, 0x17, 0x4D),
+        ), // pink
+        (
+            Color32::from_rgb(0xCF, 0xFA, 0xFE),
+            Color32::from_rgb(0x15, 0x5E, 0x75),
+        ), // cyan
+        (
+            Color32::from_rgb(0xFE, 0xF3, 0xC7),
+            Color32::from_rgb(0x85, 0x4D, 0x0E),
+        ), // gelb
+        (
+            Color32::from_rgb(0xFE, 0xE2, 0xE2),
+            Color32::from_rgb(0x99, 0x1B, 0x1B),
+        ), // rot
+        (
+            Color32::from_rgb(0xE0, 0xE7, 0xFF),
+            Color32::from_rgb(0x37, 0x30, 0xA3),
+        ), // indigo
+        (
+            Color32::from_rgb(0xEC, 0xFC, 0xCB),
+            Color32::from_rgb(0x3F, 0x62, 0x12),
+        ), // limette
+    ];
+
+    /// Farbpaar für ein Kürzel. Hängt nur vom Kürzel ab (FNV-1a), ist also auf allen Geräten
+    /// und nach jedem Neustart gleich.
+    pub fn pill(kuerzel: &str) -> (Color32, Color32) {
+        let mut h: u32 = 0x811C_9DC5;
+        for b in kuerzel.bytes() {
+            h ^= u32::from(b);
+            h = h.wrapping_mul(0x0100_0193);
+        }
+        PILLS[h as usize % PILLS.len()]
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,8 +215,8 @@ impl Kalender {
                 pos2(kopf.left() + spalte * (i as f32 + 0.5), kopf.center().y),
                 Align2::CENTER_CENTER,
                 text,
-                FontId::proportional(13.0),
-                ui.visuals().text_color(),
+                FontId::proportional(12.0),
+                farbe::TEXT_LEISE,
             );
         }
 
@@ -178,7 +236,7 @@ impl Kalender {
                 ),
                 vec2(spalte, zeile),
             )
-            .shrink(1.0);
+            .shrink(2.0);
             let antwort = ui.interact(rect, ui.scope_id().with(("tag", i)), Sense::click());
             let tag = index.tag(datum);
             antwort.widget_info(|| {
@@ -194,6 +252,7 @@ impl Kalender {
                 datum,
                 ZellenZustand {
                     anderer_monat: datum.month() != self.anzeige.month(),
+                    wochenende: i % 7 >= 5,
                     heute: datum == heute,
                     ausgewaehlt: datum == ausgewaehlt,
                     maus: antwort.hovered(),
@@ -289,10 +348,13 @@ fn pfeil_navigation(ui: &egui::Ui, ausgewaehlt: NaiveDate) -> Option<NaiveDate> 
 #[derive(Debug, Clone, Copy)]
 struct ZellenZustand {
     anderer_monat: bool,
+    wochenende: bool,
     heute: bool,
     ausgewaehlt: bool,
     maus: bool,
 }
+
+const RUNDUNG: u8 = 8;
 
 fn zelle_zeichnen(
     ui: &egui::Ui,
@@ -302,45 +364,51 @@ fn zelle_zeichnen(
     badge: Option<&str>,
     konflikte: usize,
 ) {
-    let painter = ui.painter_at(rect);
-    let hintergrund = if zustand.ausgewaehlt {
-        farbe::AUSGEWAEHLT
-    } else if zustand.anderer_monat {
-        farbe::ANDERER_MONAT
+    let painter = ui.painter_at(rect.expand(1.0));
+    let rund = CornerRadius::same(RUNDUNG);
+
+    // Fläche: ausgewählt > Maus > Wochenende, sonst frei.
+    let flaeche = if zustand.ausgewaehlt {
+        Some(farbe::AUSGEWAEHLT)
+    } else if zustand.maus {
+        Some(farbe::MAUS)
+    } else if zustand.wochenende && !zustand.anderer_monat {
+        Some(farbe::WOCHENENDE)
     } else {
-        Color32::WHITE
+        None
     };
-    painter.rect_filled(rect, CornerRadius::ZERO, hintergrund);
-    if zustand.maus && !zustand.ausgewaehlt {
-        painter.rect_filled(
+    if let Some(f) = flaeche {
+        painter.rect_filled(rect, rund, f);
+    }
+    if zustand.ausgewaehlt {
+        painter.rect_stroke(
             rect,
-            CornerRadius::ZERO,
-            farbe::AUSGEWAEHLT.gamma_multiply(0.5),
+            rund,
+            Stroke::new(1.5, farbe::AKZENT),
+            StrokeKind::Inside,
         );
     }
 
-    let kopf = Rect::from_min_size(rect.min, vec2(rect.width(), 18.0_f32.min(rect.height())));
-    let kopf_farbe = if zustand.heute {
-        farbe::HEUTE_KOPF
+    // Tageszahl oben links, „heute“ im gefüllten Kreis.
+    let mitte = rect.left_top() + vec2(13.0, 12.0);
+    let zahl_farbe = if zustand.heute {
+        painter.circle_filled(mitte, 9.5, farbe::AKZENT);
+        Color32::WHITE
+    } else if zustand.anderer_monat {
+        farbe::TEXT_BLASS
     } else {
-        farbe::KOPF
-    };
-    painter.rect_filled(kopf, CornerRadius::ZERO, kopf_farbe);
-    let text_farbe = if zustand.anderer_monat {
-        farbe::ANDERER_TEXT
-    } else {
-        Color32::BLACK
+        farbe::TEXT
     };
     painter.text(
-        kopf.left_center() + vec2(4.0, 0.0),
-        Align2::LEFT_CENTER,
+        mitte,
+        Align2::CENTER_CENTER,
         datum.day(),
-        FontId::proportional(13.0),
-        text_farbe,
+        FontId::proportional(12.5),
+        zahl_farbe,
     );
     if konflikte > 0 {
         painter.text(
-            kopf.right_center() - vec2(4.0, 0.0),
+            rect.right_top() + vec2(-6.0, 12.0),
             Align2::RIGHT_CENTER,
             "⚠",
             FontId::proportional(13.0),
@@ -349,45 +417,129 @@ fn zelle_zeichnen(
     }
 
     if let Some(badge) = badge {
-        let oben = kopf.bottom() + 4.0;
-        let hoehe = 20.0_f32.min(rect.bottom() - oben - 2.0);
-        if hoehe > 6.0 {
-            let kasten = Rect::from_min_size(
-                pos2(rect.left() + 4.0, oben),
-                vec2(rect.width() - 8.0, hoehe),
-            );
-            painter.rect(
-                kasten,
-                CornerRadius::same(4),
-                farbe::BADGE,
-                Stroke::new(1.0, farbe::BADGE_RAHMEN),
-                StrokeKind::Inside,
-            );
-            // Passt der Text nicht, linksbündig, damit der Anfang lesbar bleibt (ganzer Text im
-            // Tooltip der Zelle).
-            let innen = kasten.shrink2(vec2(4.0, 2.0));
-            let text_painter = ui.painter_at(innen);
-            let galley = text_painter.layout_no_wrap(
-                badge.to_owned(),
-                FontId::proportional(13.0),
-                Color32::BLACK,
-            );
-            let x = if galley.size().x <= innen.width() {
-                innen.center().x - galley.size().x / 2.0
+        let bereich = Rect::from_min_max(
+            pos2(rect.left() + 4.0, rect.top() + 23.0),
+            rect.right_bottom() - vec2(4.0, 1.0),
+        );
+        if badge.trim().is_empty() {
+            // Eintrag ohne Kürzel: kleiner Punkt.
+            let punkt = if zustand.anderer_monat {
+                farbe::TEXT_BLASS.gamma_multiply(0.6)
             } else {
-                innen.left()
+                farbe::TEXT_BLASS
             };
-            let y = innen.center().y - galley.size().y / 2.0;
-            text_painter.galley(pos2(x, y), galley, Color32::BLACK);
+            painter.circle_filled(bereich.left_top() + vec2(10.0, 7.0), 3.5, punkt);
+        } else {
+            pills_zeichnen(ui, bereich, badge, zustand.anderer_monat);
         }
     }
+}
 
-    let rahmen = if zustand.heute {
-        Stroke::new(2.0, farbe::HEUTE_RAHMEN)
-    } else {
-        Stroke::new(0.5, farbe::RAHMEN)
+/// Kürzel als abgerundete Kapseln, zeilenweise umbrochen. Was nicht passt, wird als „+n“
+/// zusammengefasst (der ganze Text steht im Tooltip der Zelle).
+fn pills_zeichnen(ui: &egui::Ui, bereich: Rect, badge: &str, blass: bool) {
+    if bereich.width() < 12.0 || bereich.height() < PILL_HOEHE {
+        return;
+    }
+    let painter = ui.painter_at(bereich);
+    let schrift = FontId::proportional(10.0);
+    let kuerzel: Vec<&str> = badge.split_whitespace().collect();
+    let breite = |text: &str| {
+        let b = painter
+            .layout_no_wrap(text.to_owned(), schrift.clone(), Color32::BLACK)
+            .size()
+            .x;
+        (b + 2.0 * PILL_POLSTER).min(bereich.width())
     };
-    painter.rect_stroke(rect, CornerRadius::ZERO, rahmen, StrokeKind::Inside);
+    let breiten: Vec<f32> = kuerzel.iter().map(|k| breite(k)).collect();
+    let zeilen = ((bereich.height() + PILL_ABSTAND) / (PILL_HOEHE + PILL_ABSTAND)).floor() as usize;
+
+    // Wie viele passen vollständig, ggf. zusammen mit einem „+n“ dahinter?
+    let mut anzahl = kuerzel.len();
+    let plan = loop {
+        let mut liste: Vec<f32> = breiten[..anzahl].to_vec();
+        if anzahl < kuerzel.len() {
+            liste.push(breite(&format!("+{}", kuerzel.len() - anzahl)));
+        }
+        match anordnen(&liste, bereich.width(), zeilen) {
+            Some(plan) => break plan,
+            // Mindestens ein Kürzel zeigen, notfalls ohne „+n“.
+            None if anzahl > 1 => anzahl -= 1,
+            None => break vec![(0.0, 0, breiten[0])],
+        }
+    };
+
+    let anzahl = anzahl.min(plan.len());
+    for (i, (x, zeile, b)) in plan.into_iter().enumerate() {
+        let pos = bereich.left_top() + vec2(x, zeile as f32 * (PILL_HOEHE + PILL_ABSTAND));
+        if i < anzahl {
+            let mut farben = farbe::pill(kuerzel[i]);
+            if blass {
+                farben = (farben.0.gamma_multiply(0.5), farben.1.gamma_multiply(0.5));
+            }
+            pill(&painter, pos, b, kuerzel[i], farben, &schrift);
+        } else {
+            let text = format!("+{}", kuerzel.len() - anzahl);
+            pill(
+                &painter,
+                pos,
+                b,
+                &text,
+                (farbe::MAUS, farbe::TEXT_LEISE),
+                &schrift,
+            );
+        }
+    }
+}
+
+const PILL_HOEHE: f32 = 13.0;
+const PILL_ABSTAND: f32 = 2.0;
+const PILL_POLSTER: f32 = 4.0;
+
+/// Ordnet Kapseln der Breite nach zeilenweise an: (x, Zeile, Breite), `None` wenn sie nicht in
+/// `zeilen` Zeilen passen.
+fn anordnen(breiten: &[f32], platz: f32, zeilen: usize) -> Option<Vec<(f32, usize, f32)>> {
+    let mut plan = Vec::with_capacity(breiten.len());
+    let (mut x, mut zeile) = (0.0, 0);
+    for &b in breiten {
+        if x > 0.0 && x + b > platz {
+            zeile += 1;
+            x = 0.0;
+        }
+        if zeile >= zeilen {
+            return None;
+        }
+        plan.push((x, zeile, b));
+        x += b + PILL_ABSTAND;
+    }
+    Some(plan)
+}
+
+fn pill(
+    painter: &egui::Painter,
+    links_oben: egui::Pos2,
+    breite: f32,
+    text: &str,
+    (flaeche, schrift_farbe): (Color32, Color32),
+    schrift: &FontId,
+) {
+    let rect = Rect::from_min_size(links_oben, vec2(breite, PILL_HOEHE));
+    painter.rect_filled(rect, CornerRadius::same(6), flaeche);
+    // Zu lange Kürzel linksbündig abschneiden, damit der Anfang lesbar bleibt.
+    let innen = rect.shrink2(vec2(PILL_POLSTER, 0.0));
+    let galley = painter.layout_no_wrap(text.to_owned(), schrift.clone(), schrift_farbe);
+    let x = if galley.size().x <= innen.width() {
+        innen.center().x - galley.size().x / 2.0
+    } else {
+        innen.left()
+    };
+    painter
+        .with_clip_rect(innen.intersect(painter.clip_rect()))
+        .galley(
+            pos2(x, innen.center().y - galley.size().y / 2.0),
+            galley,
+            schrift_farbe,
+        );
 }
 
 struct Feld {
@@ -412,38 +564,40 @@ fn raster_ui(ui: &mut egui::Ui, felder: &[Feld]) -> Option<usize> {
         let antwort = ui.interact(rect, ui.scope_id().with(("feld", i)), Sense::click());
         antwort.widget_info(|| egui::WidgetInfo::selected(Role::Button, true, f.markiert, &f.text));
         let painter = ui.painter();
-        let hintergrund = if f.markiert {
-            farbe::AUSGEWAEHLT
-        } else if f.ausgegraut {
-            farbe::ANDERER_MONAT
-        } else {
-            Color32::WHITE
-        };
-        painter.rect_filled(rect, CornerRadius::same(4), hintergrund);
-        if antwort.hovered() && !f.markiert {
-            painter.rect_filled(
+        let rund = CornerRadius::same(RUNDUNG);
+        if f.markiert {
+            painter.rect_filled(rect, rund, farbe::AUSGEWAEHLT);
+            painter.rect_stroke(
                 rect,
-                CornerRadius::same(4),
-                farbe::AUSGEWAEHLT.gamma_multiply(0.5),
+                rund,
+                Stroke::new(1.5, farbe::AKZENT),
+                StrokeKind::Inside,
             );
+        } else if antwort.hovered() {
+            painter.rect_filled(rect, rund, farbe::MAUS);
         }
-        let rahmen = if f.heute {
-            Stroke::new(2.0, farbe::HEUTE_RAHMEN)
+        let (schrift, text_farbe) = if f.heute {
+            (FontId::proportional(16.0), farbe::AKZENT)
+        } else if f.ausgegraut {
+            (FontId::proportional(15.0), farbe::TEXT_BLASS)
         } else {
-            Stroke::new(0.5, farbe::RAHMEN)
+            (FontId::proportional(15.0), farbe::TEXT)
         };
-        painter.rect_stroke(rect, CornerRadius::same(4), rahmen, StrokeKind::Inside);
-        painter.text(
+        let text_rect = painter.text(
             rect.center(),
             Align2::CENTER_CENTER,
             &f.text,
-            FontId::proportional(15.0),
-            if f.ausgegraut {
-                farbe::ANDERER_TEXT
-            } else {
-                Color32::BLACK
-            },
+            schrift,
+            text_farbe,
         );
+        if f.heute {
+            // Kleiner Punkt unter dem Text markiert den aktuellen Monat bzw. das aktuelle Jahr.
+            painter.circle_filled(
+                pos2(rect.center().x, text_rect.bottom() + 5.0),
+                2.5,
+                farbe::AKZENT,
+            );
+        }
         if antwort.clicked() {
             geklickt = Some(i);
         }
@@ -472,5 +626,26 @@ mod tests {
         assert_eq!(k.titel(), "2020-2029");
         k.blaettern(false);
         assert_eq!(k.titel(), "2010-2019");
+    }
+
+    #[test]
+    fn pills_umbrechen() {
+        // 3 Kapseln à 20 px in 50 px Breite: zwei in Zeile 0, eine in Zeile 1.
+        let plan = anordnen(&[20.0, 20.0, 20.0], 50.0, 2).unwrap();
+        assert_eq!(plan, vec![(0.0, 0, 20.0), (22.0, 0, 20.0), (0.0, 1, 20.0)]);
+        assert!(anordnen(&[20.0, 20.0, 20.0], 50.0, 1).is_none());
+    }
+
+    #[test]
+    fn pill_farbe_haengt_nur_vom_kuerzel_ab() {
+        assert_eq!(farbe::pill("SQ"), farbe::pill("SQ"));
+        let verschieden: std::collections::HashSet<_> = ["SQ", "DL", "BP", "OHP", "Kz", "Jo"]
+            .iter()
+            .map(|k| farbe::pill(k))
+            .collect();
+        assert!(
+            verschieden.len() >= 4,
+            "Kürzel sollten sich farblich unterscheiden"
+        );
     }
 }
